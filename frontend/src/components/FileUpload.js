@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Snackbar, Alert } from '@mui/material';
 import axios from 'axios';
+import './FileUpload.css';
 
 const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -24,6 +26,7 @@ const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     setError(null);
 
     try {
@@ -36,13 +39,19 @@ const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          onUploadProgress: (progressEvent) => {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setUploadProgress(progress);
+          },
         });
 
-        if (response.data.success) {
+        if (response.data) {
           results.push({
             type: 'pdf',
             name: file.name,
-            content: response.data.text,
+            status: 'success'
           });
         }
       }
@@ -52,6 +61,7 @@ const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
       setError(error.response?.data?.error || 'Failed to upload files');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
       event.target.value = ''; // Reset file input
     }
   };
@@ -66,6 +76,19 @@ const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
         onChange={handleFileUpload}
         style={{ display: 'none' }}
       />
+      {uploading && (
+        <div>
+          <div className="upload-progress">
+            <div 
+              className="upload-progress-bar" 
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+          <div className="upload-status">
+            Uploading... {uploadProgress}%
+          </div>
+        </div>
+      )}
       {error && (
         <Snackbar
           open={!!error}

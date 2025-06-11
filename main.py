@@ -1,20 +1,29 @@
+"""
+Main Application Server
+
+This Flask application provides an API for document processing and chat functionality.
+It uses a vector database for semantic search and the Nebius API for chat responses.
+"""
+
 import os
 import requests
 import tempfile
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from PyPDF2 import PdfReader
 from werkzeug.utils import secure_filename
 import dotenv
+from utils.document_processor import load_cv, create_db, load_db
 
+# Initialize environment
 print("Current working directory:", os.getcwd())
 print("Looking for .env file in:", os.path.abspath('.env'))
 dotenv.load_dotenv()
 
+# Load and validate API key
 print("Environment variables:", os.environ.get('NEBIUS_API_KEY'))
 
 NEBIUS_API_KEY = os.getenv('NEBIUS_API_KEY')
-#NEBIUS_API_KEY = os.getenv('eyJhbGciOiJIUzI1NiIsImtpZCI6IlV6SXJWd1h0dnprLVRvdzlLZWstc0M1akptWXBvX1VaVkxUZlpnMDRlOFUiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiJnaXRodWJ8MTA4Njc2NjMwIiwic2NvcGUiOiJvcGVuaWQgb2ZmbGluZV9hY2Nlc3MiLCJpc3MiOiJhcGlfa2V5X2lzc3VlciIsImF1ZCI6WyJodHRwczovL25lYml1cy1pbmZlcmVuY2UuZXUuYXV0aDAuY29tL2FwaS92Mi8iXSwiZXhwIjoxOTA3Mjk4MjkzLCJ1dWlkIjoiNWNkZDJiZTktNjI5ZC00N2UxLWI2NjItOGJmZDQxMjA3YzRiIiwibmFtZSI6ImRlbW8xIiwiZXhwaXJlc19hdCI6IjIwMzAtMDYtMTBUMDU6MDQ6NTMrMDAwMCJ9.44FXdIV62YNLRiPvljeeXlc65nLys9njamVbixu_JK4')
 if not NEBIUS_API_KEY:
     raise RuntimeError('NEBIUS_API_KEY environment variable not set. Please add it to your .env file.')
 
@@ -22,10 +31,12 @@ app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
+DB_FOLDER = 'chroma_db'
 ALLOWED_EXTENSIONS = {'pdf'}
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+for folder in [UPLOAD_FOLDER, DB_FOLDER]:
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -57,17 +68,60 @@ def chat():
     try:
         data = request.json
         user_message = data.get('message', '')
-        pending_files = data.get('pendingFiles', [])
         
-        # Prepare context from pending files if any
-        files_context = ""
-        if pending_files:
-            files_context = "\n\nContext from uploaded PDF files:\n"
-            for idx, file in enumerate(pending_files, 1):
-                files_context += f"\nFile {idx}: {file['name']}\nContent: {file['content']}\n"
+        # Load the vector database
+        db = load_db(DB_FOLDER)
         
-        # Combine user message with files context
-        full_message = f"{user_message}{files_context}"
+        # Search for relevant document chunks
+        search_results = db.similarity_search(user_message, k=3)
+        
+        # Track matched files and create context
+        context = "\n\nRelevant context from documents:\n"
+        matched_files = set()  # Use set to avoid duplicates
+        
+        for i, doc in enumerate(search_results, 1):
+            context += f"\nDocument {i}:\n{doc.page_content}\n"
+            if 'filename' in doc.metadata:
+                matched_files.add(doc.metadata['filename'])
+        
+        # Format the prompt with JD and CV structure
+        prompt_template = """You are an AI assistant helping recruiters evaluate candidates.
+
+Below is a Job Description (JD) and a Candidate's Resume (CV).
+
+---
+
+[Job Description]
+{jd}
+
+---
+
+[Candidate CV]
+{cv}
+
+---
+
+Please answer the following:
+
+1. Suitability Score (0–100)
+2. Key Strengths
+3. Missing or Weak Areas
+4. Final Verdict: strong match / possible fit / not a good match
+
+Return output in JSON format with the following structure:
+{{
+    "suitability_score": number,
+    "key_strengths": string[],
+    "missing_areas": string[],
+    "final_verdict": "strong match" | "possible fit" | "not a good match",
+    "explanation": string
+}}"""
+
+        # Combine user message (JD) with context (CV)
+        full_message = prompt_template.format(
+            jd=user_message,
+            cv=context
+        )
         
         response = query({
             "messages": [
@@ -76,7 +130,7 @@ def chat():
                     "content": [
                         {
                             "type": "text",
-                            "text": "You are analyzing user messages and PDF contents. If PDF content is provided, incorporate relevant information from the PDFs in your response."
+                            "text": "You are an AI assistant analyzing job descriptions and resumes. Always respond in the requested JSON format."
                         }
                     ]
                 },
@@ -95,65 +149,109 @@ def chat():
 
         if "choices" in response:
             bot_response = response["choices"][0]["message"]["content"]
-            return jsonify({"response": bot_response})
+            return jsonify({
+                "response": bot_response,
+                "matched_files": list(matched_files)  # Convert set to list for JSON serialization
+            })
         else:
             return jsonify({"error": "Invalid API response", "details": response}), 500
 
     except Exception as e:
+        print(f"Error in chat endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
     try:
+        print("Received upload request")
+        # Check if the post request has the file part
         if 'file' not in request.files:
-            return jsonify({"error": "No file part"}), 400
+            print("No file found in request.files")
+            print("Available files:", list(request.files.keys()))
+            print("Request headers:", dict(request.headers))
+            return jsonify({"error": "No file found in request"}), 400
         
         file = request.files['file']
+        print(f"Received file: {file.filename}")
+        print(f"File content type: {file.content_type}")
+        
         if file.filename == '':
+            print("Empty filename received")
             return jsonify({"error": "No selected file"}), 400
         
         if not allowed_file(file.filename):
-            return jsonify({"error": "Only PDF files are allowed"}), 400
+            print(f"Invalid file type: {file.filename}")
+            return jsonify({"error": f"Invalid file type. Only PDF files are allowed. Received: {file.content_type}"}), 400
 
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        print("Creating temporary file...")
+        # Create a temporary file and process it
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+            print(f"Temporary file created at: {temp_file.name}")
             file.save(temp_file.name)
-            extracted_text = extract_text_from_pdf(temp_file.name)
-            os.unlink(temp_file.name)  # Delete the temporary file
+            print("File saved to temporary location")
+            
+            # Save the file to uploads folder
+            filename = secure_filename(file.filename)
+            upload_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            with open(upload_path, 'wb') as upload_file:
+                with open(temp_file.name, 'rb') as tmp:
+                    upload_file.write(tmp.read())
+            print(f"File saved to uploads folder: {upload_path}")
 
-        if not extracted_text:
-            return jsonify({"error": "Failed to extract text from PDF"}), 500
-
-        # Process the extracted text with the AI model
-        response = query({
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are analyzing a PDF document. Please provide a summary and be ready to answer questions about its content."
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": f"Here's the content of the PDF document:\n\n{extracted_text}\n\nPlease provide a brief summary of this document."
-                        }
-                    ]
-                }
-            ],
-            "model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
-        })
-
-        if "choices" in response:
-            summary = response["choices"][0]["message"]["content"]
+            # Load and split the document
+            print("Loading and splitting document...")
+            documents = load_cv(temp_file.name)
+            print(f"Document loaded and split into {len(documents) if documents else 0} chunks")
+            
+            try:
+                # Try to load existing database or create new one
+                print("Loading existing database...")
+                db = load_db(DB_FOLDER)
+                print("Adding documents to existing database...")
+                db.add_documents(documents)
+                print("Documents added successfully")
+            except Exception as e:
+                print(f"Error loading existing database: {str(e)}")
+                print("Creating new database...")
+                db = create_db(documents, DB_FOLDER)
+                print("New database created successfully")
+            
+            # Clean up the temporary file
+            print("Cleaning up temporary file...")
+            os.unlink(temp_file.name)
+            print("Temporary file deleted")
+            
             return jsonify({
-                "success": True,
-                "summary": summary,
-                "text": extracted_text
+                "message": "File uploaded and processed successfully",
+                "filename": file.filename
             })
-        else:
-            return jsonify({"error": "Failed to analyze PDF content"}), 500
 
+    except Exception as e:
+        print(f"Error in upload_pdf: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get-pdf/<filename>', methods=['GET'])
+def get_pdf(filename):
+    try:
+        # Ensure the filename is secure
+        filename = secure_filename(filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+            
+        # Send the file with proper headers
+        return send_file(
+            file_path,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
