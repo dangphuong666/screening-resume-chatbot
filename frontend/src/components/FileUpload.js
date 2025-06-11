@@ -1,0 +1,85 @@
+import React, { useState, useRef } from 'react';
+import { Snackbar, Alert } from '@mui/material';
+import axios from 'axios';
+
+const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
+
+  React.useImperativeHandle(ref, () => ({
+    click: () => {
+      fileInputRef.current?.click();
+    }
+  }));
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    const invalidFiles = files.filter(file => file.type !== 'application/pdf');
+    if (invalidFiles.length > 0) {
+      setError('Please upload PDF files only');
+      return;
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const results = [];
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await axios.post('http://localhost:5000/upload-pdf', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (response.data.success) {
+          results.push({
+            type: 'pdf',
+            name: file.name,
+            content: response.data.text,
+          });
+        }
+      }
+      
+      onUploadSuccess(results);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Failed to upload files');
+    } finally {
+      setUploading(false);
+      event.target.value = ''; // Reset file input
+    }
+  };
+
+  return (
+    <div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        multiple
+        onChange={handleFileUpload}
+        style={{ display: 'none' }}
+      />
+      {error && (
+        <Snackbar
+          open={!!error}
+          autoHideDuration={4000}
+          onClose={() => setError(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setError(null)} severity="error" variant="filled">
+            {error}
+          </Alert>
+        </Snackbar>
+      )}
+    </div>
+  );
+});
+
+export default FileUpload;

@@ -1,0 +1,142 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: rgba(30, 30, 30, 0.6);
+  border-radius: 12px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.message-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 20px;
+  scroll-behavior: smooth;
+}
+
+.message {
+  margin: 8px 0;
+  max-width: 80%;
+  transition: all 0.3s ease-in-out;
+}
+
+.message:hover {
+  transform: translateY(-2px);
+}
+
+.user-message {
+  margin-left: auto;
+  background-color: #1976d2;
+}
+
+.bot-message {
+  margin-right: auto;
+  background-color: #2f2f2f;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Code block styling */
+pre {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+  padding: 16px !important;
+  border-radius: 8px !important;
+  overflow-x: auto !important;
+  margin: 16px 0 !important;
+}
+
+code {
+  font-family: 'Fira Code', 'Consolas', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
