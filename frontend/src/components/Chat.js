@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Paper, Typography, LinearProgress, Alert, Snackbar, SpeedDial, SpeedDialIcon, SpeedDialAction } from '@mui/material';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -8,17 +8,45 @@ import ChatInput from './ChatInput';
 import FileUpload from './FileUpload';
 import axios from 'axios';
 
-const Chat = () => {
+const Chat = ({ history, onNewChat }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]);
   const fileUploadRef = useRef(null);
 
+  useEffect(() => {
+    // Load chat history when component mounts or history changes
+    if (history && history.length > 0) {
+      console.log('Processing chat history:', history);
+      // Each chat entry becomes two messages: user message and bot response
+      const formattedHistory = history.slice().reverse().flatMap(chat => {
+        console.log('Processing chat entry:', chat);
+        return [
+          {
+            id: `${chat.id}-user`,
+            text: chat.job_description || '',
+            sender: 'user',
+            timestamp: new Date(chat.created_at)
+          },
+          {
+            id: `${chat.id}-bot`,
+            text: chat.ai_response || '',
+            sender: 'bot',
+            timestamp: new Date(chat.created_at),
+            matchedFiles: Array.isArray(chat.cv_filename)
+              ? chat.cv_filename.filter(Boolean)
+              : (chat.cv_filename ? chat.cv_filename.filter(Boolean) : [])
+          }
+        ];
+      }); // Newest history first, but pairs stay together
+      setMessages(formattedHistory);
+    }
+  }, [history]);
+
   const handleFileUploadSuccess = (filesData) => {
     setPendingFiles(prev => [...prev, ...filesData]);
     
-    // Add system message about file uploads
     const systemMessage = {
       id: Date.now(),
       text: `📄 ${filesData.length} PDF file${filesData.length > 1 ? 's' : ''} uploaded. Start chatting to analyze ${filesData.length > 1 ? 'them' : 'it'}.`,
@@ -26,25 +54,36 @@ const Chat = () => {
       timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, systemMessage]);
+    setMessages(prev => [systemMessage, ...prev]); // Add to beginning
   };
 
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return;
 
-    const newMessage = {
+    const messageTimestamp = new Date().toISOString();
+    const userMessage = {
       id: Date.now(),
       text,
       sender: 'user',
-      timestamp: new Date().toISOString(),
+      timestamp: messageTimestamp,
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    const botMessageId = userMessage.id + 1;
+    const placeholderMessage = {
+      id: botMessageId,
+      text: '...',
+      sender: 'bot',
+      timestamp: messageTimestamp,
+      isLoading: true
+    };
+
+    // Add messages to the beginning of the array
+    setMessages(prev => [userMessage, placeholderMessage, ...prev]);
+
     setLoading(true);
     setError(null);
 
     try {
-      // If there are pending files, send them along with the message
       const payload = {
         message: text,
         pendingFiles: pendingFiles.map(file => ({
@@ -54,43 +93,63 @@ const Chat = () => {
         }))
       };
 
-      const response = await axios.post('http://localhost:5000/chat', payload, {
-        timeout: 30000,
+      const response = await axios.post('/chat', payload, {
+        timeout: 90000,
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        withCredentials: true
       });
 
       if (response.data.error) {
         throw new Error(response.data.error);
       }
 
+      console.log('Received bot response:', response.data);
       const botMessage = {
-        id: Date.now() + 1,
-        text: response.data.response,
+        id: botMessageId,
+        text: response.data.response || '',
         sender: 'bot',
-        timestamp: new Date().toISOString(),
+        timestamp: messageTimestamp,
       };
+      console.log('Created bot message:', botMessage);
 
-      setMessages((prev) => [...prev, botMessage]);
-      // Clear pending files after processing
+      // Replace the placeholder with actual response
+      setMessages(prev => prev.map(msg => 
+        msg.id === botMessageId ? botMessage : msg
+      ));
       setPendingFiles([]);
+      
+      if (onNewChat) {
+        onNewChat();
+      }
     } catch (error) {
       console.error('Error sending message:', error);
-      setError(error.message || 'An error occurred while sending your message. Please try again.');
+      let errorMessage = 'An error occurred while sending your message. Please try again.';
       
-      const errorMessage = {
-        id: Date.now() + 1,
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'The request timed out. The AI service is taking too long to respond. Please try again.';
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      setError(errorMessage);
+      
+      // Replace the placeholder with error message
+      const errorBotMessage = {
+        id: botMessageId,
         text: 'Sorry, I encountered an error. Please try again.',
         sender: 'bot',
-        timestamp: new Date().toISOString(),
+        timestamp: messageTimestamp,
         isError: true,
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages(prev => prev.map(msg => 
+        msg.id === botMessageId ? errorBotMessage : msg
+      ));
     } finally {
       setLoading(false);
     }
-  }, [pendingFiles]);
+  }, [pendingFiles, onNewChat]);
 
   const handleCloseError = () => {
     setError(null);
@@ -103,6 +162,9 @@ const Chat = () => {
         elevation={3}
         sx={{
           position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 120px)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
           border: '1px solid rgba(255, 255, 255, 0.05)',
         }}

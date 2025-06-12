@@ -1,188 +1,122 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Typography, Box, Avatar, Chip } from '@mui/material';
+import { Paper, Typography, Box, Avatar, Chip, CircularProgress } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import InfoIcon from '@mui/icons-material/Info';
 import ReactMarkdown from 'react-markdown';
 
-const Message = ({ text, sender, isError, isFileSummary }) => {
+const Message = ({ text, sender, isError, isFileSummary, isLoading }) => {
+  console.log('Message component received:', { text, sender, isError, isFileSummary, isLoading });
   const isUser = sender === 'user';
   const isSystem = sender === 'system';
   const [displayedText, setDisplayedText] = useState('');
-  const [isTyping, setIsTyping] = useState(!isUser && !isSystem);
+  const [isTyping, setIsTyping] = useState(!isUser && !isSystem && !isLoading);
 
   useEffect(() => {
+    if (!text || isLoading) {
+      setDisplayedText('');
+      setIsTyping(false);
+      return;
+    }
+
     if (!isUser && !isSystem) {
       setDisplayedText('');
       setIsTyping(true);
       let currentText = '';
       const words = text.split(' ');
+      let currentIndex = 0;
 
-      const typeNextWord = (index) => {
-        if (index < words.length) {
-          currentText += (index === 0 ? '' : ' ') + words[index];
+      const typingInterval = setInterval(() => {
+        if (currentIndex < words.length) {
+          currentText += (currentIndex === 0 ? '' : ' ') + words[currentIndex];
           setDisplayedText(currentText);
-          const delay = Math.random() * 50 + 30; // Random delay between 30-80ms
-          setTimeout(() => typeNextWord(index + 1), delay);
+          currentIndex++;
         } else {
+          clearInterval(typingInterval);
           setIsTyping(false);
         }
-      };
+      }, 50);
 
-      typeNextWord(0);
+      return () => clearInterval(typingInterval);
     } else {
       setDisplayedText(text);
       setIsTyping(false);
     }
-  }, [text, isUser, isSystem]);
-
-  const getIcon = () => {
-    if (isSystem) return <InfoIcon />;
-    if (isUser) return <PersonIcon />;
-    return <SmartToyIcon />;
-  };
-
-  const getAvatarColor = () => {
-    if (isError) return 'error.main';
-    if (isSystem) return 'info.main';
-    if (isUser) return 'primary.main';
-    return 'secondary.main';
-  };
+  }, [text, isUser, isSystem, isLoading]);
 
   return (
     <Box
       sx={{
         display: 'flex',
+        flexDirection: 'row',
         alignItems: 'flex-start',
-        flexDirection: isUser ? 'row-reverse' : 'row',
-        mb: 2,
+        justifyContent: isUser ? 'flex-end' : 'flex-start',
         gap: 1,
-        animation: 'fadeIn 0.3s ease-in-out',
-        '@keyframes fadeIn': {
-          from: {
-            opacity: 0,
-            transform: 'translateY(10px)',
-          },
-          to: {
-            opacity: 1,
-            transform: 'translateY(0)',
-          },
-        },
+        mb: 2,
+        width: '100%',
       }}
     >
-      <Avatar
-        sx={{
-          bgcolor: getAvatarColor(),
-          mt: 0.5,
-          animation: isTyping ? 'pulse 1.5s ease-in-out infinite' : 'none',
-          '@keyframes pulse': {
-            '0%': { transform: 'scale(1)' },
-            '50%': { transform: 'scale(1.1)' },
-            '100%': { transform: 'scale(1)' },
-          },
-        }}
-      >
-        {getIcon()}
-      </Avatar>
+      {!isUser && (
+        <Avatar
+          sx={{
+            bgcolor: isSystem ? 'warning.main' : 'secondary.main',
+            width: 32,
+            height: 32,
+          }}
+        >
+          {isSystem ? (
+            <InfoIcon fontSize="small" />
+          ) : (
+            <SmartToyIcon fontSize="small" />
+          )}
+        </Avatar>
+      )}
+      
       <Paper
-        className={`message ${sender}-message`}
-        elevation={1}
         sx={{
           p: 2,
           maxWidth: '70%',
-          color: 'white',
-          backgroundColor: isError ? 'error.dark' : isSystem ? 'info.dark' : isUser ? 'primary.main' : 'background.paper',
-          borderRadius: 2,
+          bgcolor: isUser
+            ? 'primary.main'
+            : isSystem
+            ? 'warning.dark'
+            : isError
+            ? 'error.dark'
+            : 'secondary.dark',
+          color: '#fff',
+          borderRadius: isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
           position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 10,
-            [isUser ? 'right' : 'left']: -10,
-            borderStyle: 'solid',
-            borderWidth: '10px 10px 0',
-            borderColor: `${
-              isError ? '#d32f2f' : 
-              isSystem ? '#0288d1' :
-              isUser ? '#1976d2' : '#1e1e1e'
-            } transparent transparent`,
-            transform: isUser ? 'rotate(-45deg)' : 'rotate(45deg)',
-          },
-          '& pre': {
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-            padding: '10px',
-            borderRadius: '4px',
-            overflow: 'auto',
-          },
-          '& code': {
-            fontFamily: 'monospace',
-            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-            padding: '2px 4px',
-            borderRadius: '4px',
-          },
         }}
       >
-        {isFileSummary && (
-          <Box sx={{ mb: 2 }}>
-            <Chip
-              icon={<PictureAsPdfIcon />}
-              label="PDF Summary"
-              color="primary"
-              size="small"
-              sx={{ mb: 1 }}
-            />
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 1 }}>
+            <CircularProgress size={20} color="inherit" />
           </Box>
-        )}
-        <ReactMarkdown
-          components={{
-            p: ({ children }) => (
-              <Typography variant="body1" component="div" sx={{ mb: 1 }}>
-                {children}
-              </Typography>
-            ),
-          }}
-        >
-          {displayedText}
-        </ReactMarkdown>
-        {isTyping && (
-          <Box
-            sx={{
-              mt: 1,
-              display: 'flex',
-              gap: 0.5,
-              '& .dot': {
-                width: 6,
-                height: 6,
-                backgroundColor: 'rgba(255, 255, 255, 0.6)',
-                borderRadius: '50%',
-                animation: 'bounce 1.4s infinite ease-in-out',
-                '&:nth-of-type(1)': {
-                  animationDelay: '0s',
-                },
-                '&:nth-of-type(2)': {
-                  animationDelay: '0.2s',
-                },
-                '&:nth-of-type(3)': {
-                  animationDelay: '0.4s',
-                },
-              },
-              '@keyframes bounce': {
-                '0%, 100%': {
-                  transform: 'translateY(0)',
-                },
-                '50%': {
-                  transform: 'translateY(-5px)',
-                },
-              },
-            }}
-          >
-            <div className="dot" />
-            <div className="dot" />
-            <div className="dot" />
-          </Box>
+        ) : (
+          <Typography component="div">
+            {isFileSummary && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <PictureAsPdfIcon />
+                <Typography variant="subtitle2">File Summary</Typography>
+              </Box>
+            )}
+            <ReactMarkdown>{displayedText}</ReactMarkdown>
+          </Typography>
         )}
       </Paper>
+
+      {isUser && (
+        <Avatar
+          sx={{
+            bgcolor: 'primary.main',
+            width: 32,
+            height: 32,
+          }}
+        >
+          <PersonIcon fontSize="small" />
+        </Avatar>
+      )}
     </Box>
   );
 };

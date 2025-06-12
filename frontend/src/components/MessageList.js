@@ -15,18 +15,14 @@ const MessageList = ({ messages }) => {
   const scrollToBottom = () => {
     if (containerRef.current) {
       const scrollContainer = containerRef.current;
-      const { scrollHeight, clientHeight, scrollTop } = scrollContainer;
-      const maxScrollTop = scrollHeight - clientHeight;
-      
-      // If user has scrolled up more than 100px, don't auto-scroll
-      if (maxScrollTop - scrollTop < 100 || scrollHeight > previousScrollHeight.current) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }
-      previousScrollHeight.current = scrollHeight;
+      // Always scroll to new messages
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      previousScrollHeight.current = scrollContainer.scrollHeight;
     }
   };
 
   useEffect(() => {
+    console.log('MessageList received messages:', messages);
     scrollToBottom();
   }, [messages]);
 
@@ -35,8 +31,12 @@ const MessageList = ({ messages }) => {
       ref={containerRef}
       className="message-list"
       sx={{
+        flex: 1,
         overflowY: 'auto',
         scrollBehavior: 'smooth',
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column', // Standard top-to-bottom layout
         '&::-webkit-scrollbar': {
           width: '8px',
         },
@@ -54,10 +54,18 @@ const MessageList = ({ messages }) => {
       }}
     >
       {messages.map((message, index) => (
-        <Box key={message.id}>
+        <Box
+          key={message.id}
+          sx={{
+            mb: 2,
+            '&:last-of-type': {
+              mb: 0
+            }
+          }}
+        >
           {(index === 0 ||
             new Date(message.timestamp).toDateString() !==
-              new Date(messages[index - 1].timestamp).toDateString()) && (
+            new Date(messages[index - 1].timestamp).toDateString()) && (
             <Typography
               variant="caption"
               sx={{
@@ -70,25 +78,12 @@ const MessageList = ({ messages }) => {
               {new Date(message.timestamp).toLocaleDateString()}
             </Typography>
           )}
-          <Box sx={{ position: 'relative' }}>
-            <Message
-              text={message.text}
-              sender={message.sender}
-              isError={message.isError}
-            />
-            <Typography
-              variant="caption"
-              sx={{
-                position: 'absolute',
-                bottom: -4,
-                [message.sender === 'user' ? 'left' : 'right']: 12,
-                color: 'text.disabled',
-                fontSize: '0.7rem',
-              }}
-            >
-              {formatTimestamp(message.timestamp)}
-            </Typography>
-          </Box>
+          <Message
+            text={message.text}
+            sender={message.sender}
+            isError={message.isError}
+            isLoading={message.isLoading}
+          />
         </Box>
       ))}
       <div ref={messagesEndRef} />

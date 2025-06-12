@@ -65,7 +65,7 @@ const ChatInput = ({ onSend, disabled, fileUploadRef }) => {
         placeholder="Type your message..."
         disabled={disabled}
         multiline
-        rows={rows}
+        minRows={1}
         maxRows={maxRows}
         variant="outlined"
         size="medium"
@@ -84,19 +84,21 @@ const ChatInput = ({ onSend, disabled, fileUploadRef }) => {
       />
       {message && (
         <Tooltip title="Clear message">
-          <IconButton
-            onClick={clearInput}
-            size="small"
-            sx={{
-              position: 'absolute',
-              right: 120,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'text.secondary',
-            }}
-          >
-            <ClearIcon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton
+              onClick={clearInput}
+              size="small"
+              sx={{
+                position: 'absolute',
+                right: 120,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'text.secondary',
+              }}
+            >
+              <ClearIcon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
       )}
       <Tooltip title="Upload PDF">
@@ -114,21 +116,23 @@ const ChatInput = ({ onSend, disabled, fileUploadRef }) => {
         </IconButton>
       </Tooltip>
       <Tooltip title={disabled ? 'Processing...' : 'Send message'}>
-        <IconButton
-          type="submit"
-          color="primary"
-          disabled={disabled || !message.trim()}
-          sx={{
-            width: 56,
-            height: 56,
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-            },
-          }}
-        >
-          {disabled ? <CircularProgress size={24} /> : <SendIcon />}
-        </IconButton>
+        <span>
+          <IconButton
+            type="submit"
+            color="primary"
+            disabled={disabled || !message.trim()}
+            sx={{
+              width: 56,
+              height: 56,
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                backgroundColor: 'primary.dark',
+              },
+            }}
+          >
+            {disabled ? <CircularProgress size={24} /> : <SendIcon />}
+          </IconButton>
+        </span>
       </Tooltip>
     </Box>
   );
