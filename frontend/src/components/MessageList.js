@@ -15,16 +15,24 @@ const MessageList = ({ messages }) => {
   const scrollToBottom = () => {
     if (containerRef.current) {
       const scrollContainer = containerRef.current;
-      // Always scroll to new messages
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Force immediate scroll to bottom without animation for best UX
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
       previousScrollHeight.current = scrollContainer.scrollHeight;
     }
   };
 
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     console.log('MessageList received messages:', messages);
     scrollToBottom();
   }, [messages]);
+
+  // Ensure scroll position stays at bottom when window is resized
+  useEffect(() => {
+    const handleResize = () => scrollToBottom();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <Box
@@ -33,10 +41,11 @@ const MessageList = ({ messages }) => {
       sx={{
         flex: 1,
         overflowY: 'auto',
-        scrollBehavior: 'smooth',
+        scrollBehavior: 'auto', // Changed to auto for more responsive scrolling
         padding: '20px',
         display: 'flex',
-        flexDirection: 'column', // Standard top-to-bottom layout
+        flexDirection: 'column',
+        maxHeight: 'calc(100vh - 200px)', // Limit height to prevent overflow
         '&::-webkit-scrollbar': {
           width: '8px',
         },

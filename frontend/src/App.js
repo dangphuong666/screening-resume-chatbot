@@ -10,11 +10,13 @@ import {
   AppBar, 
   Toolbar,
   CircularProgress,
-  Alert
+  Alert,
+  Grid
 } from '@mui/material';
 import React, { useState, useEffect } from 'react';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import Chat from './components/Chat';
+import PdfStats from './components/PdfStats';
 import './App.css';
 
 function App() {
@@ -223,25 +225,48 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <AppBar position="static" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <AppBar position="static">
           <Toolbar>
             <SmartToyIcon sx={{ mr: 2 }} />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              AI Chat Assistant
+              Resume Analysis Assistant
             </Typography>
-            {user && (
-              <Typography variant="body2" sx={{ mr: 2 }}>
-                {user.email}
+            {isAuthenticated && user && (
+              <Typography variant="subtitle1" sx={{ mr: 2 }}>
+                Welcome, {user.name}
               </Typography>
             )}
-            <Button color="inherit" onClick={handleLogout}>
-              Logout
-            </Button>
+            {isAuthenticated ? (
+              <Button color="inherit" onClick={handleLogout}>Logout</Button>
+            ) : (
+              <Button color="inherit" onClick={handleLogin}>Login with Google</Button>
+            )}
           </Toolbar>
         </AppBar>
-        <Container maxWidth="md" sx={{ flex: 1, py: 4 }}>
-          <Chat history={chatHistory} onNewChat={fetchChatHistory} />
+
+        <Container maxWidth="lg" sx={{ flexGrow: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={8}>
+              {authError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{authError}</Alert>
+              )}
+              {isLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <Chat
+                  chatHistory={chatHistory}
+                  isAuthenticated={isAuthenticated}
+                  onLogin={handleLogin}
+                />
+              )}
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <PdfStats />
+            </Grid>
+          </Grid>
         </Container>
       </Box>
     </ThemeProvider>

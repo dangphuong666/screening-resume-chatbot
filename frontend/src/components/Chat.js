@@ -20,7 +20,8 @@ const Chat = ({ history, onNewChat }) => {
     if (history && history.length > 0) {
       console.log('Processing chat history:', history);
       // Each chat entry becomes two messages: user message and bot response
-      const formattedHistory = history.slice().reverse().flatMap(chat => {
+      // Process history chronologically (oldest first)
+      const formattedHistory = history.flatMap(chat => {
         console.log('Processing chat entry:', chat);
         return [
           {
@@ -36,11 +37,11 @@ const Chat = ({ history, onNewChat }) => {
             timestamp: new Date(chat.created_at),
             matchedFiles: Array.isArray(chat.cv_filename)
               ? chat.cv_filename.filter(Boolean)
-              : (chat.cv_filename ? chat.cv_filename.filter(Boolean) : [])
+              : (chat.cv_filename ? chat.cv_filename.split(',').filter(Boolean) : [])
           }
         ];
-      }); // Newest history first, but pairs stay together
-      setMessages(formattedHistory);
+      });
+      setMessages(formattedHistory); // Maintains chronological order
     }
   }, [history]);
 
@@ -58,43 +59,39 @@ const Chat = ({ history, onNewChat }) => {
   };
 
   const sendMessage = useCallback(async (text) => {
-    if (!text.trim()) return;
+    if (!text.trim() && pendingFiles.length === 0) return;
 
-    const messageTimestamp = new Date().toISOString();
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const botMessageId = `bot-${messageId}`;
+    const messageTimestamp = new Date();
+
+    // Add user message to chat
     const userMessage = {
-      id: Date.now(),
-      text,
+      id: messageId,
+      text: text.trim(),
       sender: 'user',
       timestamp: messageTimestamp,
     };
 
-    const botMessageId = userMessage.id + 1;
-    const placeholderMessage = {
+    // Add placeholder for bot response
+    const botPlaceholder = {
       id: botMessageId,
       text: '...',
       sender: 'bot',
       timestamp: messageTimestamp,
-      isLoading: true
+      isLoading: true,
     };
 
-    // Add messages to the beginning of the array
-    setMessages(prev => [userMessage, placeholderMessage, ...prev]);
-
+    // Add both messages to the end of the messages array
+    setMessages(prev => [...prev, userMessage, botPlaceholder]);
     setLoading(true);
-    setError(null);
 
     try {
-      const payload = {
+      const response = await axios.post('/chat', {
         message: text,
-        pendingFiles: pendingFiles.map(file => ({
-          name: file.name,
-          content: file.content,
-          summary: file.summary
-        }))
-      };
-
-      const response = await axios.post('/chat', payload, {
-        timeout: 90000,
+        files: pendingFiles,
+      }, {
+        timeout: 300000, // 5-minute timeout
         headers: {
           'Content-Type': 'application/json',
         },
@@ -105,16 +102,15 @@ const Chat = ({ history, onNewChat }) => {
         throw new Error(response.data.error);
       }
 
-      console.log('Received bot response:', response.data);
+      // Update the bot message with the actual response
       const botMessage = {
         id: botMessageId,
         text: response.data.response || '',
         sender: 'bot',
         timestamp: messageTimestamp,
       };
-      console.log('Created bot message:', botMessage);
 
-      // Replace the placeholder with actual response
+      // Replace the placeholder while maintaining order
       setMessages(prev => prev.map(msg => 
         msg.id === botMessageId ? botMessage : msg
       ));
@@ -135,7 +131,7 @@ const Chat = ({ history, onNewChat }) => {
       
       setError(errorMessage);
       
-      // Replace the placeholder with error message
+      // Update the placeholder with error message
       const errorBotMessage = {
         id: botMessageId,
         text: 'Sorry, I encountered an error. Please try again.',

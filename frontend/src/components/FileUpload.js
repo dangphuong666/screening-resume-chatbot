@@ -3,7 +3,7 @@ import { Snackbar, Alert } from '@mui/material';
 import axios from 'axios';
 import './FileUpload.css';
 
-const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
+const FileUpload = React.forwardRef(({ onUploadSuccess, onUploadComplete }, ref) => {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
@@ -49,18 +49,20 @@ const FileUpload = React.forwardRef(({ onUploadSuccess }, ref) => {
 
         if (response.data) {
           results.push({
-            type: 'pdf',
-            name: file.name,
-            status: 'success'
+            filename: file.name,
+            success: true,
+            message: response.data.message
           });
         }
       }
       
-      onUploadSuccess(results);
-    } catch (error) {
-      setError(error.response?.data?.error || 'Failed to upload files');
-    } finally {
       setUploading(false);
+      onUploadSuccess && onUploadSuccess(results);
+      onUploadComplete && onUploadComplete(); // Trigger stats refresh
+    } catch (error) {
+      setError(error.response?.data?.error || 'Failed to upload file');
+      setUploading(false);
+    } finally {
       setUploadProgress(0);
       event.target.value = ''; // Reset file input
     }

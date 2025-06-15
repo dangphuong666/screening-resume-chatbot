@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Install Dependencies and Initialize Database",
+			"type": "shell",
+			"command": "pip install -r requirements.txt",
+			"group": "build",
+			"problemMatcher": []
+		}
+	]
+}
