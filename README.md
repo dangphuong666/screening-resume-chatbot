@@ -1,124 +1,127 @@
-# AI Chat Assistant
+# Resume Screening Chatbot
 
-A modern chat interface powered by Nebius AI, built with React and Flask. This application allows users to chat with an AI assistant and analyze PDF documents through conversation.
+A full-stack AI-powered system for automated resume (CV) screening, job description matching, and candidate analysis.  
+Built with React (frontend) and Flask (backend), leveraging multimodal LLMs (Mistral via Hugging Face), semantic search (ChromaDB), and Google OAuth authentication.
+
+---
 
 ## Features
 
-- 🎯 Modern, responsive Material-UI interface
-- 💬 Real-time chat with AI
-- 📄 PDF file upload and analysis
-- ✨ Multiple file upload support
-- 🔍 Context-aware responses
-- 🎨 Dark theme with glassmorphism design
+- **Google OAuth Authentication:** Secure login for users.
+- **PDF Upload:** Upload candidate CVs in PDF format.
+- **Semantic Search:** Find and match CVs to job descriptions using vector embeddings.
+- **Multimodal LLM Analysis:** Uses Mistral LLM (via Hugging Face) to analyze both text and images from CVs.
+- **Chat Interface:** Interactive chat for job description input and candidate analysis.
+- **PDF Statistics:** View stats about uploaded/processed CVs.
+- **Session Management:** Secure, server-side sessions with Flask-Session.
+- **Modern UI:** Built with React and Material-UI.
+
+---
+
+## System Purpose
+
+To automate and enhance the recruitment process by enabling intelligent, AI-driven screening and matching of candidate CVs against job descriptions.
+
+## System Audience
+
+- HR professionals and recruiters
+- Hiring managers
+- Talent acquisition teams
+- Organizations seeking to automate resume screening
+
+---
+
+## Technologies Used
+
+- **Frontend:** React, Material-UI
+- **Backend:** Flask, Flask-Session, Flask-Login, Flask-SQLAlchemy, Flask-CORS
+- **Authentication:** Google OAuth 2.0
+- **PDF Processing:** PyPDF2, pdf2image, pytesseract, Pillow
+- **Vector DB & Embeddings:** ChromaDB, LangChain, HuggingFaceEmbeddings (`BAAI/bge-large-en-v1.5`)
+- **LLM:** Mistral (via Hugging Face Inference API)
+- **Database:** SQLite (for user and chat data)
+- **Session Storage:** Filesystem (`flask_session/`)
+
+---
 
 ## Project Structure
 
 ```
-chat bot/
-├── frontend/          # React frontend application
-│   ├── src/          # Source code
-│   │   ├── components/ # React components
-│   │   └── ...       # Other frontend files
-│   ├── public/       # Static files
-│   └── package.json  # Frontend dependencies
-├── main.py           # Flask backend server
-├── pdf_process.py    # PDF processing utilities
-├── requirements.txt  # Python dependencies
-└── uploads/         # PDF upload directory
+frontend/         # React app (UI, chat, PDF stats, etc.)
+  src/
+    App.js
+    components/
+      Chat.js
+      PdfStats.js
+      FileUpload.js
+      MessageList.js
+      ...
+server/           # Flask backend (API, auth, processing)
+  main.py
+  document_processor.py
+  chroma_db/      # Chroma vector DB files
+  flask_session/  # Session files
+  instance/       # SQLite DB
+uploads/          # Uploaded PDF files
 ```
 
-## Prerequisites
+---
 
-- Python 3.8 or higher
-- Node.js 14.0 or higher
-- npm or yarn
+## Getting Started
 
-## Installation
+### 1. Clone the repository
 
-1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd chat-bot
+git clone https://github.com/dangphuong666/screening-resume-chatbot.git
+cd screening-resume-chatbot
 ```
 
-2. Set up the Python backend:
-```bash
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### 2. Backend Setup
 
-# Install Python dependencies
+```bash
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Set up the React frontend:
-```bash
-cd frontend
-npm install
+Create a `.env` file in the root directory with:
+
+```
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+HF_TOKEN=your_huggingface_token
+FLASK_ENV=development
+FLASK_DEBUG=1
 ```
 
-## Configuration
+Start the backend:
 
-1. Set your Nebius AI API key in `main.py`:
-```python
-os.environ["NEBIUS_API_KEY"] = "your-api-key-here"
-```
-
-## Running the Application
-
-1. Start the Flask backend server:
 ```bash
-# From the root directory
-source venv/bin/activate  # If not already activated
+cd server
 python main.py
 ```
 
-2. Start the React frontend development server:
+### 3. Frontend Setup
+
 ```bash
-# In another terminal, from the frontend directory
+cd frontend
+npm install
 npm start
 ```
 
-The application will be available at:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
+The app will be available at [http://localhost:3000](http://localhost:3000).
+
+---
 
 ## Usage
 
-1. Start chatting by typing in the message input
-2. Upload PDF files using either:
-   - The floating action button in the bottom right
-   - The upload button next to the message input
-3. Chat with the AI about the uploaded documents
-4. The AI will incorporate information from the PDFs in its responses
+1. Log in with Google.
+2. Upload candidate CVs (PDF).
+3. Enter a job description in the chat.
+4. View AI-powered candidate analysis and PDF statistics.
 
-## Development
-
-- Backend API endpoint: http://localhost:5000/chat
-- Frontend development server: http://localhost:3000
-- Frontend build: `npm run build` in the frontend directory
-
-## Technologies Used
-
-- Frontend:
-  - React.js
-  - Material-UI
-  - React Markdown
-  - Axios
-
-- Backend:
-  - Flask
-  - Flask-CORS
-  - Nebius AI API
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+---
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
