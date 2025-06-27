@@ -8,7 +8,7 @@ const PdfStats = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/pdf-stats');
+      const response = await axios.get('http://localhost:5000/pdf-stats', { withCredentials: true });
       setStats(response.data);
       setError(null);
     } catch (err) {
@@ -41,7 +41,7 @@ const PdfStats = () => {
         Total PDFs: {stats.total_count}
       </Typography>
       <List>
-        {stats.files.map((file) => (
+        {Array.isArray(stats.files) && stats.files.map((file) => (
           <ListItem key={file.name}>
             <ListItemText
               primary={file.name}
